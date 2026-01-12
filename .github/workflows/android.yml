@@ -1,17 +1,9 @@
-name: Android Build & Release
+name: Android Build Without Gradlew
 
 on:
   push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:  # Manual trigger
-
-env:
-  BUILD_TOOLS_VERSION: "34.0.0"
-  COMPILE_SDK_VERSION: "34"
-  TARGET_SDK_VERSION: "34"
-  MIN_SDK_VERSION: "21"
+    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   build:
@@ -30,80 +22,29 @@ jobs:
     - name: Setup Android SDK
       uses: android-actions/setup-android@v3
       
-    - name: Make gradlew executable
-      run: chmod +x ./gradlew
-      
-    - name: Cache Gradle dependencies
-      uses: actions/cache@v3
-      with:
-        path: |
-          ~/.gradle/caches
-          ~/.gradle/wrapper
-        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
-        restore-keys: |
-          ${{ runner.os }}-gradle-
-          
+    - name: Install Gradle
+      run: |
+        # Install gradle directly
+        wget https://services.gradle.org/distributions/gradle-8.5-bin.zip
+        unzip gradle-8.5-bin.zip
+        echo "GRADLE_HOME=$PWD/gradle-8.5" >> $GITHUB_ENV
+        echo "$PWD/gradle-8.5/bin" >> $GITHUB_PATH
+        
     - name: Build with Gradle
       run: |
+        # Direct gradle build
+        gradle wrapper --gradle-version 8.5
+        
+        # Now use the generated wrapper
+        chmod +x ./gradlew
         ./gradlew assembleDebug
         ./gradlew assembleRelease
         
-    - name: Upload Debug APK
+    - name: Upload APKs
       uses: actions/upload-artifact@v4
       with:
-        name: wifi-cracker-debug-apk
-        path: app/build/outputs/apk/debug/app-debug.apk
+        name: android-apks
+        path: |
+          app/build/outputs/apk/debug/
+          app/build/outputs/apk/release/
         retention-days: 7
-        
-    - name: Upload Release APK
-      uses: actions/upload-artifact@v4
-      with:
-        name: wifi-cracker-release-apk
-        path: app/build/outputs/apk/release/app-release-unsigned.apk
-        retention-days: 7
-        
-    - name: Create GitHub Release
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: softprops/action-gh-release@v1
-      with:
-        tag_name: v1.0.${{ github.run_number }}
-        name: WiFi Cracker v1.0.${{ github.run_number }}
-        body: |
-          🚀 Automated Build - WiFi Password Cracker
-          
-          ### Changes in this build:
-          - Automated GitHub Actions build
-          - Debug and Release APKs
-          - Android SDK 34
-          - Min SDK 21
-          
-          ### Download Links:
-          - Debug APK: `app-debug.apk`
-          - Release APK: `app-release-unsigned.apk`
-          
-          ### Build Info:
-          - Build Number: ${{ github.run_number }}
-          - Commit: ${{ github.sha }}
-          - Branch: ${{ github.ref }}
-          
-          ⚠️ **For educational purposes only**
-        files: |
-          app/build/outputs/apk/debug/app-debug.apk
-          app/build/outputs/apk/release/app-release-unsigned.apk
-        draft: false
-        prerelease: false
-        generate_release_notes: true
-        
-    - name: Send Discord Notification
-      if: always()
-      uses: sarisia/actions-status-discord@v1
-      with:
-        webhook: ${{ secrets.DISCORD_WEBHOOK }}
-        title: "WiFi Cracker Build ${{ job.status }}"
-        description: |
-          **Build Number:** ${{ github.run_number }}
-          **Status:** ${{ job.status }}
-          **Branch:** ${{ github.ref }}
-          
-          [View Build](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-          [Download APK](https://github.com/${{ github.repository }}/releases/latest)
