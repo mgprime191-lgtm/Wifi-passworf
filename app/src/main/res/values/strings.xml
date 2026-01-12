@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">WiFi Cracker</string>
+    <string name="scan_wifi">Scan WiFi</string>
+    <string name="crack_password">Crack Password</string>
+    <string name="status_ready">Status: Ready</string>
+</resources>
